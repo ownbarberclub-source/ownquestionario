@@ -17,6 +17,7 @@ export interface Questionnaire {
   title: string;
   description: string;
   is_active: boolean;
+  is_anonymous?: boolean;
   created_at?: string;
   questions?: Question[];
 }

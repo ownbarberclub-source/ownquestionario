@@ -23,6 +23,7 @@ interface LocalQuestion {
 export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [questions, setQuestions] = useState<LocalQuestion[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -142,7 +143,8 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
         id: crypto.randomUUID(),
         title: title.trim(),
         description: description.trim(),
-        is_active: false // É criado como inativo por padrão
+        is_active: false, // É criado como inativo por padrão
+        is_anonymous: isAnonymous
       };
 
       const { error: questErr } = await supabase
@@ -224,6 +226,24 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
                 className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-brand min-h-[60px] resize-none"
                 placeholder="Ex: Esse formulário serve para medirmos as necessidades da equipe de barbeiros."
               />
+            </div>
+
+            <div className="flex items-center gap-3 bg-zinc-950/40 p-3.5 border border-zinc-850 rounded-xl">
+              <input
+                type="checkbox"
+                id="isAnonymous"
+                checked={isAnonymous}
+                onChange={(e) => setIsAnonymous(e.target.checked)}
+                className="rounded border-zinc-800 text-brand focus:ring-0 focus:ring-offset-0 bg-zinc-900 w-4 h-4 cursor-pointer accent-brand"
+              />
+              <div className="select-none cursor-pointer">
+                <label htmlFor="isAnonymous" className="block text-xs font-bold text-zinc-200 cursor-pointer">
+                  Questionário Anônimo
+                </label>
+                <span className="block text-[10px] text-zinc-400 mt-0.5 leading-relaxed">
+                  Se ativado, as respostas dos barbeiros serão coletadas sem identificá-los (pula a seleção de nome/unidade).
+                </span>
+              </div>
             </div>
           </div>
 

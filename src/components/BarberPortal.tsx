@@ -50,6 +50,14 @@ export function BarberPortal() {
         .maybeSingle();
 
       if (questData) {
+        // Se for anônimo, verificar localStorage para duplicidade antes de buscar perguntas
+        if (questData.is_anonymous) {
+          const answeredLocal = localStorage.getItem(`answered_${questData.id}`);
+          if (answeredLocal) {
+            setAlreadyAnswered(true);
+          }
+        }
+
         // Buscar perguntas do questionário
         const { data: questionsData } = await supabase
           .from('questionnaire_questions')
@@ -184,8 +192,10 @@ export function BarberPortal() {
 
     setSubmitting(true);
     try {
-      const barber = barbers.find(b => b.id === selectedBarber);
-      const unit = units.find(u => u.id === selectedUnit);
+      const isAnonymous = !!activeQuestionnaire.is_anonymous;
+
+      const barber = isAnonymous ? null : barbers.find(b => b.id === selectedBarber);
+      const unit = isAnonymous ? null : units.find(u => u.id === selectedUnit);
 
       // Compilar a resposta da última pergunta
       const answer = answers[currentQuestion.id];
@@ -200,9 +210,9 @@ export function BarberPortal() {
       // 1. Inserir cabeçalho da resposta
       const responseObj = {
         questionnaire_id: activeQuestionnaire.id,
-        barber_id: selectedBarber,
-        barber_name: barber?.name || 'Desconhecido',
-        unit_name: unit?.name || 'Geral'
+        barber_id: isAnonymous ? null : selectedBarber,
+        barber_name: isAnonymous ? 'Anônimo' : (barber?.name || 'Desconhecido'),
+        unit_name: isAnonymous ? 'Anônimo' : (unit?.name || 'Geral')
       };
 
       const { data: respData, error: respErr } = await supabase
@@ -225,6 +235,11 @@ export function BarberPortal() {
         .insert(answersToInsert);
 
       if (ansErr) throw ansErr;
+
+      // Se for anônimo, gravar localmente para impedir múltiplos envios
+      if (isAnonymous) {
+        localStorage.setItem(`answered_${activeQuestionnaire.id}`, 'true');
+      }
 
       setSubmitted(true);
     } catch (err) {
@@ -263,6 +278,8 @@ export function BarberPortal() {
   }
 
   if (alreadyAnswered) {
+    const isAnonymous = !!activeQuestionnaire.is_anonymous;
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-4 font-sans">
         <div className="max-w-md w-full text-center bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl">
@@ -274,16 +291,18 @@ export function BarberPortal() {
             Você já enviou suas respostas para o questionário: <br />
             <strong className="text-zinc-200">"{activeQuestionnaire.title}"</strong>.
           </p>
-          <button
-            onClick={() => {
-              setAlreadyAnswered(false);
-              setSelectedBarber('');
-              setIsIdentified(false);
-            }}
-            className="w-full bg-zinc-800 text-zinc-300 py-3 rounded-xl font-semibold hover:bg-zinc-700 transition-colors text-sm"
-          >
-            Responder como outro barbeiro
-          </button>
+          {!isAnonymous && (
+            <button
+              onClick={() => {
+                setAlreadyAnswered(false);
+                setSelectedBarber('');
+                setIsIdentified(false);
+              }}
+              className="w-full bg-zinc-800 text-zinc-300 py-3 rounded-xl font-semibold hover:bg-zinc-700 transition-colors text-sm"
+            >
+              Responder como outro barbeiro
+            </button>
+          )}
         </div>
       </div>
     );
@@ -321,15 +340,21 @@ export function BarberPortal() {
   }
 
   if (!isIdentified) {
+    const isAnonymous = !!activeQuestionnaire.is_anonymous;
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-4 py-12 font-sans">
         <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-2xl space-y-6">
           <div className="text-center">
             <h2 className="text-sm font-bold uppercase tracking-widest text-brand font-mono">OWN Barber Club</h2>
             <h1 className="text-2xl font-black tracking-tight text-zinc-100 mt-1 uppercase italic">
-              Portal do Barbeiro
+              {isAnonymous ? 'Pesquisa Anônima' : 'Portal do Barbeiro'}
             </h1>
-            <p className="text-zinc-400 text-xs mt-1">Identifique-se para responder ao questionário ativo</p>
+            <p className="text-zinc-400 text-xs mt-1">
+              {isAnonymous 
+                ? 'Suas respostas serão coletadas de forma totalmente privada.' 
+                : 'Identifique-se para responder ao questionário ativo'}
+            </p>
           </div>
 
           <div className="bg-zinc-950/60 p-4 border border-zinc-800/80 rounded-xl space-y-1">
@@ -340,48 +365,63 @@ export function BarberPortal() {
             )}
           </div>
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-zinc-400">Selecione sua Unidade</label>
-              <select
-                value={selectedUnit}
-                onChange={(e) => {
-                  setSelectedUnit(e.target.value);
-                  setSelectedBarber('');
-                }}
-                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-200 focus:outline-none focus:border-brand cursor-pointer h-11"
+          {isAnonymous ? (
+            <div className="space-y-4 pt-2">
+              <p className="text-xs text-zinc-450 leading-relaxed text-center bg-zinc-950/30 p-3 rounded-lg border border-zinc-850">
+                Esta pesquisa não coletará seu nome, unidade ou qualquer informação que possa identificá-lo.
+              </p>
+              <button
+                onClick={() => setIsIdentified(true)}
+                className="w-full flex items-center justify-center gap-2 bg-brand text-white py-3 rounded-xl font-bold hover:bg-brand-light transition-colors uppercase text-xs tracking-wider pt-3.5 pb-3.5 mt-4 cursor-pointer"
               >
-                <option value="">Selecione...</option>
-                {units.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
+                Iniciar Responder Anônimo
+                <ArrowRight size={16} />
+              </button>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-zinc-400">Selecione sua Unidade</label>
+                <select
+                  value={selectedUnit}
+                  onChange={(e) => {
+                    setSelectedUnit(e.target.value);
+                    setSelectedBarber('');
+                  }}
+                  className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-200 focus:outline-none focus:border-brand cursor-pointer h-11"
+                >
+                  <option value="">Selecione...</option>
+                  {units.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-zinc-400">Selecione seu Nome</label>
-              <select
-                disabled={!selectedUnit}
-                value={selectedBarber}
-                onChange={(e) => setSelectedBarber(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-200 focus:outline-none focus:border-brand cursor-pointer h-11 disabled:opacity-50"
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-zinc-400">Selecione seu Nome</label>
+                <select
+                  disabled={!selectedUnit}
+                  value={selectedBarber}
+                  onChange={(e) => setSelectedBarber(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-200 focus:outline-none focus:border-brand cursor-pointer h-11 disabled:opacity-50"
+                >
+                  <option value="">Selecione...</option>
+                  {filteredBarbers.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                disabled={!selectedUnit || !selectedBarber}
+                onClick={handleStartQuestionnaire}
+                className="w-full flex items-center justify-center gap-2 bg-brand text-white py-3 rounded-xl font-bold hover:bg-brand-light transition-colors disabled:opacity-40 uppercase text-xs tracking-wider pt-3.5 pb-3.5 mt-6 cursor-pointer"
               >
-                <option value="">Selecione...</option>
-                {filteredBarbers.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+                Iniciar Questionário
+                <ArrowRight size={16} />
+              </button>
             </div>
-
-            <button
-              disabled={!selectedUnit || !selectedBarber}
-              onClick={handleStartQuestionnaire}
-              className="w-full flex items-center justify-center gap-2 bg-brand text-white py-3 rounded-xl font-bold hover:bg-brand-light transition-colors disabled:opacity-40 uppercase text-xs tracking-wider pt-3.5 pb-3.5 mt-6 cursor-pointer"
-            >
-              Iniciar Questionário
-              <ArrowRight size={16} />
-            </button>
-          </div>
+          )}
         </div>
       </div>
     );

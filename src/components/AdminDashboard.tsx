@@ -356,6 +356,13 @@ export function AdminDashboard() {
                           </>
                         )}
                       </button>
+
+                      {/* Badge Anônimo se for o caso */}
+                      {quest.is_anonymous && (
+                        <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">
+                          Anônimo
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -372,7 +379,14 @@ export function AdminDashboard() {
             <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl shadow-md space-y-4">
               <div className="flex justify-between items-start gap-4">
                 <div>
-                  <h3 className="text-lg font-bold text-zinc-100">{selectedQuestionnaire.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-zinc-100">{selectedQuestionnaire.title}</h3>
+                    {selectedQuestionnaire.is_anonymous && (
+                      <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">
+                        Anônimo
+                      </span>
+                    )}
+                  </div>
                   {selectedQuestionnaire.description && (
                     <p className="text-xs text-zinc-400 mt-1">{selectedQuestionnaire.description}</p>
                   )}
