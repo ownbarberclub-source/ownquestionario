@@ -131,6 +131,29 @@ export function AdminDashboard() {
     }
   };
 
+  const handleDeleteResponse = async (responseId: string, barberName: string) => {
+    if (!window.confirm(`Tem certeza que deseja EXCLUIR a resposta de "${barberName}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('questionnaire_responses')
+        .delete()
+        .eq('id', responseId);
+
+      if (error) throw error;
+
+      alert('Resposta excluída com sucesso!');
+      if (selectedQuestId) {
+        loadResponses(selectedQuestId);
+      }
+    } catch (err) {
+      console.error('Erro ao excluir resposta:', err);
+      alert('Erro ao excluir a resposta do banco.');
+    }
+  };
+
   // Carrega as perguntas do questionário selecionado atualmente
   const selectedQuestionnaire = useMemo(() => {
     return questionnaires.find(q => q.id === selectedQuestId) || null;
@@ -614,19 +637,38 @@ export function AdminDashboard() {
                       </p>
                     </div>
 
-                    <button className="flex items-center gap-1 text-xs font-semibold text-brand hover:underline cursor-pointer">
-                      {isExpanded ? (
-                        <>
-                          Esconder Respostas
-                          <ChevronUp className="w-4 h-4" />
-                        </>
-                      ) : (
-                        <>
-                          Ver Respostas
-                          <ChevronDown className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedResponse(isExpanded ? null : resp.id);
+                        }}
+                        className="flex items-center gap-1 text-xs font-semibold text-brand hover:underline cursor-pointer"
+                      >
+                        {isExpanded ? (
+                          <>
+                            Esconder Respostas
+                            <ChevronUp className="w-4 h-4" />
+                          </>
+                        ) : (
+                          <>
+                            Ver Respostas
+                            <ChevronDown className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteResponse(resp.id, resp.barber_name);
+                        }}
+                        className="p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                        title="Excluir Avaliação"
+                      >
+                        <Trash className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {isExpanded && (
