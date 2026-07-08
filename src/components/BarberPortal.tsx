@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Unit, Barber, Questionnaire, Question } from '../types';
+import type { Unit, Barber, Questionnaire, Question } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ArrowRight, ArrowLeft, Star, Send, ShieldAlert, Award } from 'lucide-react';
 

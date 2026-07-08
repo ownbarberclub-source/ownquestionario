@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { Questionnaire, Question, QuestionnaireResponse, Answer } from '../types';
+import type { Questionnaire, Question, QuestionnaireResponse, Answer } from '../types';
 import { QuestionnaireCreator } from './QuestionnaireCreator';
 import { 
   FileText, Plus, Trash, CheckCircle2, Circle, Eye, EyeOff, 

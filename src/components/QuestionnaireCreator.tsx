@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Questionnaire, Question, QuestionType } from '../types';
+import type { Questionnaire, Question, QuestionType } from '../types';
 import { supabase } from '../supabaseClient';
 import { Plus, Trash, ArrowUp, ArrowDown, Save, X, AlignLeft, Star, List } from 'lucide-react';
 
