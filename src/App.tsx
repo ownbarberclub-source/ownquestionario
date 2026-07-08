@@ -4,7 +4,8 @@ import type { User } from './types';
 import { BarberPortal } from './components/BarberPortal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Login } from './components/Login';
-import { LogOut, LayoutDashboard, ClipboardList, ShieldAlert } from 'lucide-react';
+import { LogOut, ClipboardList, ShieldAlert } from 'lucide-react';
+import logoImg from './assets/logo.png';
 
 export default function App() {
   const [view, setView] = useState<'barber' | 'admin'>('barber');
@@ -184,11 +185,11 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-zinc-950 rounded-xl flex items-center justify-center border border-zinc-800 text-brand shadow-md">
-                <LayoutDashboard className="w-5 h-5" />
+              <div className="w-9 h-9 bg-zinc-950 rounded-xl flex items-center justify-center border border-zinc-800 p-1.5 overflow-hidden shadow-md">
+                <img src={logoImg} alt="OWN Logo" className="w-full h-full object-contain" />
               </div>
-              <h1 className="text-lg font-black tracking-tighter text-zinc-100 uppercase italic">
-                OWN <span className="text-brand">PAINEL</span> ADMIN
+              <h1 className="text-sm font-black tracking-tighter text-zinc-100 uppercase italic">
+                OWN <span className="text-brand">- QUESTIONÁRIO</span>
               </h1>
             </div>
 

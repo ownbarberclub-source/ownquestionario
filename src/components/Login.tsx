@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LogIn, Eye, EyeOff, Scissors } from 'lucide-react';
+import { LogIn, Eye, EyeOff } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 interface LoginProps {
   onLogin: (email: string, pass: string) => void;
@@ -20,13 +21,13 @@ export function Login({ onLogin, error }: LoginProps) {
     <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-4 selection:bg-brand/30 font-sans">
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-8 text-center border-b border-zinc-800 bg-zinc-900/50">
-          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-brand/10 text-brand rounded-2xl border border-brand/20">
-            <Scissors className="w-8 h-8" />
+          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-zinc-950 border border-zinc-800 rounded-2xl p-2.5 overflow-hidden">
+            <img src={logoImg} alt="OWN Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-100 uppercase italic">
-            OWN <span className="text-brand">BARBER</span> CLUB
+          <h1 className="text-2xl font-black tracking-tight text-zinc-100 uppercase italic">
+            OWN <span className="text-brand">- QUESTIONÁRIO</span>
           </h1>
-          <p className="text-sm text-zinc-400 mt-2">Painel Administrativo — Questionários</p>
+          <p className="text-sm text-zinc-400 mt-2">Painel Administrativo</p>
         </div>
         
         <div className="p-8">

@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import type { Unit, Barber, Questionnaire } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ArrowRight, ArrowLeft, Star, Send, ShieldAlert, Award } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export function BarberPortal() {
   const [units, setUnits] = useState<Unit[]>([]);
@@ -346,8 +347,11 @@ export function BarberPortal() {
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-4 py-12 font-sans">
         <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-2xl space-y-6">
           <div className="text-center">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-brand font-mono">OWN Barber Club</h2>
-            <h1 className="text-2xl font-black tracking-tight text-zinc-100 mt-1 uppercase italic">
+            <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-zinc-950 border border-zinc-800 rounded-2xl p-2.5 overflow-hidden mx-auto shadow-md">
+              <img src={logoImg} alt="OWN Logo" className="w-full h-full object-contain" />
+            </div>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-brand font-mono">OWN - QUESTIONÁRIOS</h2>
+            <h1 className="text-xl font-black tracking-tight text-zinc-100 mt-1 uppercase italic">
               {isAnonymous ? 'Pesquisa Anônima' : 'Portal do Barbeiro'}
             </h1>
             <p className="text-zinc-400 text-xs mt-1">
@@ -439,9 +443,14 @@ export function BarberPortal() {
       {/* Header Fixo */}
       <header className="bg-zinc-900 border-b border-zinc-800 px-4 py-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div>
-            <h2 className="text-[10px] font-bold uppercase tracking-wider text-brand font-mono">OWN QUESTIONÁRIOS</h2>
-            <h1 className="text-sm font-bold text-zinc-200 truncate">{activeQuestionnaire.title}</h1>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-zinc-950 border border-zinc-800 rounded-lg p-1 overflow-hidden flex items-center justify-center shadow-sm">
+              <img src={logoImg} alt="OWN Logo" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <h2 className="text-[9px] font-bold uppercase tracking-wider text-brand font-mono">OWN - QUESTIONÁRIOS</h2>
+              <h1 className="text-xs font-bold text-zinc-200 truncate max-w-[200px]">{activeQuestionnaire.title}</h1>
+            </div>
           </div>
           <span className="text-xs text-zinc-500 font-semibold font-mono">
             {currentStep + 1} de {questions.length}
