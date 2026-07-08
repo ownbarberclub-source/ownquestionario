@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { QuestionType } from '../types';
 import { supabase } from '../supabaseClient';
 import { Plus, Trash, ArrowUp, ArrowDown, Save, X, AlignLeft, Star, List } from 'lucide-react';
@@ -6,6 +6,7 @@ import { Plus, Trash, ArrowUp, ArrowDown, Save, X, AlignLeft, Star, List } from 
 interface QuestionnaireCreatorProps {
   onClose: () => void;
   onSave: () => void;
+  editQuestionnaireId?: string | null;
 }
 
 interface LocalOption {
@@ -20,12 +21,72 @@ interface LocalQuestion {
   options: LocalOption[];
 }
 
-export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorProps) {
+export function QuestionnaireCreator({ onClose, onSave, editQuestionnaireId }: QuestionnaireCreatorProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [questions, setQuestions] = useState<LocalQuestion[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (editQuestionnaireId) {
+      loadEditData();
+    }
+  }, [editQuestionnaireId]);
+
+  const loadEditData = async () => {
+    setLoading(true);
+    try {
+      // 1. Carrega dados do questionário
+      const { data: quest, error: questErr } = await supabase
+        .from('barber_questionnaires')
+        .select('*')
+        .eq('id', editQuestionnaireId)
+        .single();
+
+      if (questErr) throw questErr;
+
+      if (quest) {
+        setTitle(quest.title);
+        setDescription(quest.description || '');
+        setIsAnonymous(!!quest.is_anonymous);
+      }
+
+      // 2. Carrega as perguntas
+      const { data: questionsData, error: questionsErr } = await supabase
+        .from('questionnaire_questions')
+        .select('*')
+        .eq('questionnaire_id', editQuestionnaireId)
+        .order('sort_order', { ascending: true });
+
+      if (questionsErr) throw questionsErr;
+
+      if (questionsData) {
+        const mapped: LocalQuestion[] = questionsData.map(q => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          options: (q.options || []).map((opt: any) => {
+            if (typeof opt === 'string') {
+              return { text: opt, requireJustification: false };
+            }
+            return {
+              text: opt.text || '',
+              requireJustification: !!opt.requireJustification
+            };
+          })
+        }));
+        setQuestions(mapped);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados para edição:', err);
+      alert('Falha ao carregar dados do questionário.');
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addQuestion = (type: QuestionType) => {
     const newQ: LocalQuestion = {
@@ -138,38 +199,83 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
 
     setSaving(true);
     try {
-      // 1. Inserir o questionário
-      const newQuest = {
-        id: crypto.randomUUID(),
-        title: title.trim(),
-        description: description.trim(),
-        is_active: false, // É criado como inativo por padrão
-        is_anonymous: isAnonymous
-      };
+      if (editQuestionnaireId) {
+        // --- MODO EDIÇÃO ---
+        // 1. Atualizar questionário geral
+        const { error: questErr } = await supabase
+          .from('barber_questionnaires')
+          .update({
+            title: title.trim(),
+            description: description.trim(),
+            is_anonymous: isAnonymous
+          })
+          .eq('id', editQuestionnaireId);
 
-      const { error: questErr } = await supabase
-        .from('barber_questionnaires')
-        .insert([newQuest]);
+        if (questErr) throw questErr;
 
-      if (questErr) throw questErr;
+        // 2. Excluir perguntas que foram removidas do editor
+        const activeQuestionIds = questions.map(q => q.id);
+        const { error: deleteErr } = await supabase
+          .from('questionnaire_questions')
+          .delete()
+          .eq('questionnaire_id', editQuestionnaireId)
+          .not('id', 'in', `(${activeQuestionIds.join(',')})`);
 
-      // 2. Inserir as perguntas vinculadas
-      const questionsToInsert = questions.map((q, idx) => ({
-        id: q.id,
-        questionnaire_id: newQuest.id,
-        text: q.text.trim(),
-        type: q.type,
-        options: q.type === 'multiple_choice' ? q.options : null,
-        sort_order: idx
-      }));
+        if (deleteErr) throw deleteErr;
 
-      const { error: questQuestionsErr } = await supabase
-        .from('questionnaire_questions')
-        .insert(questionsToInsert);
+        // 3. Upsert nas perguntas atuais
+        const questionsToUpsert = questions.map((q, idx) => ({
+          id: q.id,
+          questionnaire_id: editQuestionnaireId,
+          text: q.text.trim(),
+          type: q.type,
+          options: q.type === 'multiple_choice' ? q.options : null,
+          sort_order: idx
+        }));
 
-      if (questQuestionsErr) throw questQuestionsErr;
+        const { error: upsertErr } = await supabase
+          .from('questionnaire_questions')
+          .upsert(questionsToUpsert);
 
-      alert('Questionário criado com sucesso!');
+        if (upsertErr) throw upsertErr;
+
+        alert('Questionário atualizado com sucesso!');
+      } else {
+        // --- MODO CRIAÇÃO ---
+        // 1. Inserir o questionário
+        const newQuest = {
+          id: crypto.randomUUID(),
+          title: title.trim(),
+          description: description.trim(),
+          is_active: false, // É criado como inativo por padrão
+          is_anonymous: isAnonymous
+        };
+
+        const { error: questErr } = await supabase
+          .from('barber_questionnaires')
+          .insert([newQuest]);
+
+        if (questErr) throw questErr;
+
+        // 2. Inserir as perguntas vinculadas
+        const questionsToInsert = questions.map((q, idx) => ({
+          id: q.id,
+          questionnaire_id: newQuest.id,
+          text: q.text.trim(),
+          type: q.type,
+          options: q.type === 'multiple_choice' ? q.options : null,
+          sort_order: idx
+        }));
+
+        const { error: questQuestionsErr } = await supabase
+          .from('questionnaire_questions')
+          .insert(questionsToInsert);
+
+        if (questQuestionsErr) throw questQuestionsErr;
+
+        alert('Questionário criado com sucesso!');
+      }
+
       onSave();
       onClose();
     } catch (err) {
@@ -180,6 +286,17 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
     }
   };
 
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm">
+        <div className="bg-zinc-900 border border-zinc-800 w-full max-w-3xl rounded-2xl p-12 text-center shadow-2xl">
+          <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-zinc-400 text-sm">Carregando dados do questionário...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm">
       <div className="bg-zinc-900 border border-zinc-800 w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
@@ -189,9 +306,11 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
           <div>
             <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
               <Plus className="w-5 h-5 text-brand" />
-              Novo Questionário
+              {editQuestionnaireId ? 'Editar Questionário' : 'Novo Questionário'}
             </h2>
-            <p className="text-xs text-zinc-400 mt-1">Crie um questionário personalizado para os barbeiros</p>
+            <p className="text-xs text-zinc-400 mt-1">
+              {editQuestionnaireId ? 'Modifique os detalhes da pesquisa existente' : 'Crie um questionário personalizado para os barbeiros'}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -408,7 +527,7 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
               className="flex items-center gap-2 bg-brand text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-brand-light transition-all cursor-pointer shadow-lg shadow-brand/10 disabled:opacity-55"
             >
               <Save className="w-4 h-4" />
-              {saving ? 'Salvando...' : 'Salvar Questionário'}
+              {saving ? 'Salvando...' : editQuestionnaireId ? 'Atualizar Questionário' : 'Salvar Questionário'}
             </button>
           </div>
 

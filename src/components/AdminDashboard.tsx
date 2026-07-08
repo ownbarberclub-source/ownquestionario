@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import type { Questionnaire, Question, QuestionnaireResponse } from '../types';
 import { QuestionnaireCreator } from './QuestionnaireCreator';
 import { 
-  FileText, Plus, Trash, CheckCircle2, Circle, 
+  FileText, Plus, Trash, CheckCircle2, Circle, Edit2,
   BarChart3, Users, Clock, RefreshCw, ChevronDown, ChevronUp, Star 
 } from 'lucide-react';
 
@@ -14,6 +14,7 @@ export function AdminDashboard() {
   
   // Modais e Status
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+  const [editQuestId, setEditQuestId] = useState<string | null>(null);
   const [expandedResponse, setExpandedResponse] = useState<string | null>(null);
 
   // Filtros
@@ -314,16 +315,29 @@ export function AdminDashboard() {
                   >
                     <div className="flex justify-between items-start gap-2">
                       <h4 className="text-sm font-bold text-zinc-100 line-clamp-1">{quest.title}</h4>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteQuestionnaire(quest.id, quest.title);
-                        }}
-                        className="text-zinc-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer"
-                        title="Deletar Questionário"
-                      >
-                        <Trash className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditQuestId(quest.id);
+                            setIsCreatorOpen(true);
+                          }}
+                          className="text-zinc-500 hover:text-zinc-300 p-0.5 transition-colors cursor-pointer"
+                          title="Editar Questionário"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteQuestionnaire(quest.id, quest.title);
+                          }}
+                          className="text-zinc-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer"
+                          title="Deletar Questionário"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
@@ -646,8 +660,15 @@ export function AdminDashboard() {
       {/* Modal Criador de Questionários */}
       {isCreatorOpen && (
         <QuestionnaireCreator
-          onClose={() => setIsCreatorOpen(false)}
-          onSave={loadDashboardData}
+          editQuestionnaireId={editQuestId}
+          onClose={() => {
+            setIsCreatorOpen(false);
+            setEditQuestId(null);
+          }}
+          onSave={() => {
+            loadDashboardData();
+            setEditQuestId(null);
+          }}
         />
       )}
 
