@@ -25,12 +25,35 @@ export function AdminDashboard() {
     loadDashboardData();
   }, []);
 
+  // Carrega respostas e se inscreve no canal em tempo real para sincronização instantânea
   useEffect(() => {
-    if (selectedQuestId) {
-      loadResponses(selectedQuestId);
-    } else {
+    if (!selectedQuestId) {
       setResponses([]);
+      return;
     }
+
+    loadResponses(selectedQuestId);
+
+    // Canal de Realtime para monitorar inserções/exclusões e atualizar a tela na hora
+    const channel = supabase
+      .channel(`responses-realtime-${selectedQuestId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'questionnaire_responses',
+          filter: `questionnaire_id=eq.${selectedQuestId}`
+        },
+        () => {
+          loadResponses(selectedQuestId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedQuestId]);
 
   const loadDashboardData = async () => {
@@ -43,12 +66,19 @@ export function AdminDashboard() {
 
       if (questsData && questsData.length > 0) {
         setQuestionnaires(questsData);
-        // Selecionar o primeiro questionário (ou o ativo) por padrão
-        const active = questsData.find(q => q.is_active);
-        setSelectedQuestId(active ? active.id : questsData[0].id);
+        
+        // Se já houver um questionário selecionado, recarrega as respostas ativas
+        if (selectedQuestId) {
+          loadResponses(selectedQuestId);
+        } else {
+          // Selecionar o primeiro questionário (ou o ativo) por padrão
+          const active = questsData.find(q => q.is_active);
+          setSelectedQuestId(active ? active.id : questsData[0].id);
+        }
       } else {
         setQuestionnaires([]);
         setSelectedQuestId('');
+        setResponses([]);
       }
     } catch (err) {
       console.error('Erro ao carregar questionários:', err);
