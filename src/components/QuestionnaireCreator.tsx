@@ -8,11 +8,16 @@ interface QuestionnaireCreatorProps {
   onSave: () => void;
 }
 
+interface LocalOption {
+  text: string;
+  requireJustification: boolean;
+}
+
 interface LocalQuestion {
   id: string;
   text: string;
   type: QuestionType;
-  options: string[];
+  options: LocalOption[];
 }
 
 export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorProps) {
@@ -26,7 +31,12 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
       id: crypto.randomUUID(),
       text: '',
       type,
-      options: type === 'multiple_choice' ? ['Sim', 'Não'] : []
+      options: type === 'multiple_choice' 
+        ? [
+            { text: 'Sim', requireJustification: false }, 
+            { text: 'Não', requireJustification: false }
+          ] 
+        : []
     };
     setQuestions([...questions, newQ]);
   };
@@ -42,17 +52,34 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
   const addOption = (questionId: string) => {
     setQuestions(questions.map(q => {
       if (q.id === questionId) {
-        return { ...q, options: [...q.options, 'Nova Opção'] };
+        return { 
+          ...q, 
+          options: [...q.options, { text: 'Nova Opção', requireJustification: false }] 
+        };
       }
       return q;
     }));
   };
 
-  const updateOptionText = (questionId: string, optionIndex: number, val: string) => {
+  const updateOptionText = (questionId: string, optionIndex: number, text: string) => {
     setQuestions(questions.map(q => {
       if (q.id === questionId) {
         const nextOpt = [...q.options];
-        nextOpt[optionIndex] = val;
+        nextOpt[optionIndex] = { ...nextOpt[optionIndex], text };
+        return { ...q, options: nextOpt };
+      }
+      return q;
+    }));
+  };
+
+  const toggleOptionJustification = (questionId: string, optionIndex: number) => {
+    setQuestions(questions.map(q => {
+      if (q.id === questionId) {
+        const nextOpt = [...q.options];
+        nextOpt[optionIndex] = { 
+          ...nextOpt[optionIndex], 
+          requireJustification: !nextOpt[optionIndex].requireJustification 
+        };
         return { ...q, options: nextOpt };
       }
       return q;
@@ -99,6 +126,12 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
     const invalidOption = questions.some(q => q.type === 'multiple_choice' && q.options.length < 2);
     if (invalidOption) {
       alert('Perguntas de múltipla escolha devem ter no mínimo 2 opções.');
+      return;
+    }
+
+    const invalidOptionText = questions.some(q => q.type === 'multiple_choice' && q.options.some(o => !o.text.trim()));
+    if (invalidOptionText) {
+      alert('Todas as opções de múltipla escolha devem possuir um texto preenchido.');
       return;
     }
 
@@ -199,7 +232,7 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Perguntas ({questions.length})</h3>
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 font-sans">
                 <button
                   type="button"
                   onClick={() => addQuestion('rating')}
@@ -228,13 +261,13 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
             </div>
 
             {questions.length === 0 ? (
-              <div className="bg-zinc-950/40 border border-zinc-850 p-8 rounded-xl text-center text-zinc-500 text-xs leading-relaxed">
+              <div className="bg-zinc-950/40 border border-zinc-850 p-8 rounded-xl text-center text-zinc-500 text-xs leading-relaxed font-sans">
                 Nenhuma pergunta adicionada ainda. Clique nos botões acima para adicionar perguntas!
               </div>
             ) : (
               <div className="space-y-4">
                 {questions.map((q, index) => (
-                  <div key={q.id} className="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-4 space-y-3 relative">
+                  <div key={q.id} className="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-4 space-y-3 relative font-sans">
                     
                     {/* Linha Topo da Pergunta */}
                     <div className="flex justify-between items-center">
@@ -296,25 +329,39 @@ export function QuestionnaireCreator({ onClose, onSave }: QuestionnaireCreatorPr
                           </button>
                         </div>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 gap-2.5">
                           {q.options.map((opt, optIdx) => (
-                            <div key={optIdx} className="flex items-center gap-2">
+                            <div key={optIdx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-zinc-900/40 p-2 border border-zinc-850 rounded-lg">
                               <input
                                 type="text"
                                 required
-                                value={opt}
+                                value={opt.text}
                                 onChange={(e) => updateOptionText(q.id, optIdx, e.target.value)}
-                                className="flex-1 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-xs text-zinc-200 focus:outline-none focus:border-brand"
+                                className="flex-1 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-md text-xs text-zinc-200 focus:outline-none focus:border-brand"
                                 placeholder={`Opção ${optIdx + 1}`}
                               />
-                              <button
-                                type="button"
-                                disabled={q.options.length <= 2}
-                                onClick={() => removeOption(q.id, optIdx)}
-                                className="text-zinc-500 hover:text-zinc-300 disabled:opacity-20 cursor-pointer"
-                              >
-                                <Trash className="w-3.5 h-3.5" />
-                              </button>
+                              
+                              <div className="flex items-center justify-between sm:justify-start gap-4">
+                                <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 select-none cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={opt.requireJustification}
+                                    onChange={() => toggleOptionJustification(q.id, optIdx)}
+                                    className="rounded border-zinc-800 text-brand focus:ring-0 focus:ring-offset-0 bg-zinc-900 w-3.5 h-3.5 cursor-pointer accent-brand"
+                                  />
+                                  Requer Justificativa?
+                                </label>
+
+                                <button
+                                  type="button"
+                                  disabled={q.options.length <= 2}
+                                  onClick={() => removeOption(q.id, optIdx)}
+                                  className="text-zinc-500 hover:text-red-400 disabled:opacity-20 cursor-pointer p-1"
+                                  title="Remover opção"
+                                >
+                                  <Trash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>

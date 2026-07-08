@@ -186,15 +186,45 @@ export function AdminDashboard() {
         const totalRating = qAnswers.reduce((acc, a) => acc + Number(a.answer_value || 0), 0);
         averageRating = qAnswers.length > 0 ? parseFloat((totalRating / qAnswers.length).toFixed(1)) : 0;
       } else if (q.type === 'multiple_choice') {
+        const getOptionText = (opt: any): string => {
+          if (!opt) return '';
+          if (typeof opt === 'string') return opt;
+          return opt.text || '';
+        };
+
         // Inicializa com 0 para todas as opções
         q.options?.forEach(opt => {
-          optionsCounts[opt] = 0;
+          const text = getOptionText(opt);
+          if (text) optionsCounts[text] = 0;
         });
+
         qAnswers.forEach(a => {
           if (a.answer_value) {
-            optionsCounts[a.answer_value] = (optionsCounts[a.answer_value] || 0) + 1;
+            const rawVal = a.answer_value;
+            const optionText = rawVal.includes(' | Justificativa: ')
+              ? rawVal.split(' | Justificativa: ')[0]
+              : rawVal;
+            optionsCounts[optionText] = (optionsCounts[optionText] || 0) + 1;
           }
         });
+
+        // Coleta justificativas associadas a múltipla escolha
+        const justificationsList: { option: string; barber: string; unit: string; val: string }[] = [];
+        filteredResponses.forEach(r => {
+          const ans = r.answers?.find(a => a.question_id === q.id);
+          if (ans?.answer_value && ans.answer_value.includes(' | Justificativa: ')) {
+            const [optText, justText] = ans.answer_value.split(' | Justificativa: ');
+            justificationsList.push({
+              option: optText,
+              barber: r.barber_name,
+              unit: r.unit_name,
+              val: justText
+            });
+          }
+        });
+        
+        // Adiciona à análise
+        (q as any).optionJustifications = justificationsList;
       } else if (q.type === 'text') {
         textResponses = filteredResponses.map(r => {
           const ans = r.answers?.find(a => a.question_id === q.id);
@@ -212,7 +242,8 @@ export function AdminDashboard() {
         type: q.type,
         averageRating,
         optionsCounts,
-        textResponses
+        textResponses,
+        optionJustifications: (q as any).optionJustifications || []
       };
     });
 
@@ -459,21 +490,43 @@ export function AdminDashboard() {
 
                     {/* Resposta de Múltipla Escolha */}
                     {q.type === 'multiple_choice' && (
-                      <div className="space-y-2">
-                        {Object.entries(q.optionsCounts).map(([opt, count]) => {
-                          const percent = analytics.total > 0 ? Math.round((count / analytics.total) * 100) : 0;
-                          return (
-                            <div key={opt} className="space-y-1">
-                              <div className="flex justify-between text-xs font-semibold text-zinc-300">
-                                <span>{opt}</span>
-                                <span>{count} ({percent}%)</span>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          {Object.entries(q.optionsCounts).map(([opt, count]) => {
+                            const percent = analytics.total > 0 ? Math.round((count / analytics.total) * 100) : 0;
+                            return (
+                              <div key={opt} className="space-y-1">
+                                <div className="flex justify-between text-xs font-semibold text-zinc-300">
+                                  <span>{opt}</span>
+                                  <span>{count} ({percent}%)</span>
+                                </div>
+                                <div className="h-2 bg-zinc-900 rounded-full overflow-hidden">
+                                  <div className="h-full bg-brand rounded-full" style={{ width: `${percent}%` }} />
+                                </div>
                               </div>
-                              <div className="h-2 bg-zinc-900 rounded-full overflow-hidden">
-                                <div className="h-full bg-brand rounded-full" style={{ width: `${percent}%` }} />
-                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Justificativas Coletadas para esta pergunta de escolha múltipla */}
+                        {q.optionJustifications && q.optionJustifications.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-zinc-800/60 space-y-2">
+                            <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Justificativas Apresentadas:</h5>
+                            <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                              {q.optionJustifications.map((j: any, jIdx: number) => (
+                                <div key={jIdx} className="bg-zinc-900/60 border border-zinc-850 p-2 px-3 rounded-lg text-xs leading-relaxed space-y-1">
+                                  <p className="text-zinc-200">
+                                    <span className="text-brand font-semibold text-[10px] uppercase mr-1.5">[{j.option}]</span>
+                                    "{j.val}"
+                                  </p>
+                                  <p className="text-[10px] text-zinc-500 text-right font-medium">
+                                    — {j.barber} ({j.unit})
+                                  </p>
+                                </div>
+                              ))}
                             </div>
-                          );
-                        })}
+                          </div>
+                        )}
                       </div>
                     )}
 

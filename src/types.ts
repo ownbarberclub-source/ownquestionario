@@ -23,12 +23,17 @@ export interface Questionnaire {
 
 export type QuestionType = 'rating' | 'multiple_choice' | 'text';
 
+export interface QuestionOption {
+  text: string;
+  requireJustification?: boolean;
+}
+
 export interface Question {
   id: string;
   questionnaire_id: string;
   text: string;
   type: QuestionType;
-  options?: string[]; // Array de strings para múltipla escolha
+  options?: (string | QuestionOption)[] | null;
   sort_order: number;
 }
 

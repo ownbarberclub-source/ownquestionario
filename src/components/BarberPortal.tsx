@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import type { Unit, Barber, Questionnaire, Question } from '../types';
+import type { Unit, Barber, Questionnaire } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ArrowRight, ArrowLeft, Star, Send, ShieldAlert, Award } from 'lucide-react';
 
@@ -19,6 +19,7 @@ export function BarberPortal() {
   // Fluxo das Perguntas
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [justificationText, setJustificationText] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -68,13 +69,11 @@ export function BarberPortal() {
     }
   };
 
-  // Filtra barbeiros pela unidade selecionada
   const filteredBarbers = barbers.filter(b => b.unit_id === selectedUnit);
 
   const handleStartQuestionnaire = async () => {
     if (!selectedUnit || !selectedBarber || !activeQuestionnaire) return;
 
-    // Verificar se o barbeiro já respondeu a este questionário
     try {
       setLoading(true);
       const { data } = await supabase
@@ -96,18 +95,82 @@ export function BarberPortal() {
     }
   };
 
+  // Helper para normalizar estrutura de opções (Retrocompatibilidade)
+  const getOptionInfo = (opt: any): { text: string; requireJustification: boolean } => {
+    if (!opt) return { text: '', requireJustification: false };
+    if (typeof opt === 'string') {
+      return { text: opt, requireJustification: false };
+    }
+    return {
+      text: opt.text || '',
+      requireJustification: !!opt.requireJustification
+    };
+  };
+
+  const questions = activeQuestionnaire?.questions || [];
+  const currentQuestion = questions[currentStep];
+
+  // Efeito para restaurar justificativa se o usuário voltar para uma pergunta já respondida
+  useEffect(() => {
+    if (currentQuestion && answers[currentQuestion.id]) {
+      const fullAnswer = answers[currentQuestion.id];
+      if (currentQuestion.type === 'multiple_choice' && fullAnswer.includes(' | Justificativa: ')) {
+        const [optText, justText] = fullAnswer.split(' | Justificativa: ');
+        setAnswers(prev => ({ ...prev, [currentQuestion.id]: optText }));
+        setJustificationText(justText || '');
+      } else {
+        setJustificationText('');
+      }
+    } else {
+      setJustificationText('');
+    }
+  }, [currentStep, currentQuestion?.id]);
+
   const handleAnswerSelect = (questionId: string, value: string) => {
     setAnswers(prev => ({
       ...prev,
       [questionId]: value
     }));
+    // Resetar a justificativa ao mudar a opção
+    setJustificationText('');
   };
 
-  const nextStep = () => {
-    if (!activeQuestionnaire?.questions) return;
-    if (currentStep < activeQuestionnaire.questions.length - 1) {
-      setCurrentStep(prev => prev + 1);
+  const isCurrentStepValid = () => {
+    if (!currentQuestion) return false;
+    const answer = answers[currentQuestion.id];
+    if (!answer) return false;
+
+    if (currentQuestion.type === 'multiple_choice') {
+      const selectedOption = currentQuestion.options?.find(opt => getOptionInfo(opt).text === answer);
+      const info = getOptionInfo(selectedOption);
+      if (info.requireJustification && !justificationText.trim()) {
+        return false;
+      }
     }
+
+    if (currentQuestion.type === 'text' && !answer.trim()) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!currentQuestion || !isCurrentStepValid()) return;
+
+    // Atualiza estado local compilando a justificativa
+    const answer = answers[currentQuestion.id];
+    const selectedOption = currentQuestion.options?.find(opt => getOptionInfo(opt).text === answer);
+    const info = getOptionInfo(selectedOption);
+
+    let updatedAnswers = { ...answers };
+    if (currentQuestion.type === 'multiple_choice' && info.requireJustification) {
+      updatedAnswers[currentQuestion.id] = `${answer} | Justificativa: ${justificationText.trim()}`;
+    }
+
+    setAnswers(updatedAnswers);
+    setJustificationText('');
+    setCurrentStep(prev => prev + 1);
   };
 
   const prevStep = () => {
@@ -117,19 +180,22 @@ export function BarberPortal() {
   };
 
   const handleSubmit = async () => {
-    if (!activeQuestionnaire?.questions || submitting) return;
-    
-    // Validar se todas as perguntas foram respondidas
-    const unanswered = activeQuestionnaire.questions.some(q => !answers[q.id]);
-    if (unanswered) {
-      alert('Por favor, responda a todas as perguntas antes de enviar.');
-      return;
-    }
+    if (!activeQuestionnaire?.questions || submitting || !isCurrentStepValid()) return;
 
     setSubmitting(true);
     try {
       const barber = barbers.find(b => b.id === selectedBarber);
       const unit = units.find(u => u.id === selectedUnit);
+
+      // Compilar a resposta da última pergunta
+      const answer = answers[currentQuestion.id];
+      const selectedOption = currentQuestion.options?.find(opt => getOptionInfo(opt).text === answer);
+      const info = getOptionInfo(selectedOption);
+
+      let finalAnswers = { ...answers };
+      if (currentQuestion.type === 'multiple_choice' && info.requireJustification) {
+        finalAnswers[currentQuestion.id] = `${answer} | Justificativa: ${justificationText.trim()}`;
+      }
 
       // 1. Inserir cabeçalho da resposta
       const responseObj = {
@@ -151,7 +217,7 @@ export function BarberPortal() {
       const answersToInsert = activeQuestionnaire.questions.map(q => ({
         response_id: respData.id,
         question_id: q.id,
-        answer_value: answers[q.id]
+        answer_value: finalAnswers[q.id]
       }));
 
       const { error: ansErr } = await supabase
@@ -180,7 +246,6 @@ export function BarberPortal() {
     );
   }
 
-  // Caso não haja questionário ativo
   if (!activeQuestionnaire) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-4 font-sans">
@@ -197,7 +262,6 @@ export function BarberPortal() {
     );
   }
 
-  // Caso já tenha respondido
   if (alreadyAnswered) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-4 font-sans">
@@ -225,7 +289,6 @@ export function BarberPortal() {
     );
   }
 
-  // Tela de Sucesso após envio
   if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-4 font-sans">
@@ -245,6 +308,7 @@ export function BarberPortal() {
               setSelectedBarber('');
               setIsIdentified(false);
               setAnswers({});
+              setJustificationText('');
               setCurrentStep(0);
             }}
             className="w-full bg-brand text-white py-3 rounded-xl font-bold hover:bg-brand-light transition-colors text-sm uppercase tracking-wider"
@@ -256,7 +320,6 @@ export function BarberPortal() {
     );
   }
 
-  // 1. Tela de Identificação
   if (!isIdentified) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-4 py-12 font-sans">
@@ -278,7 +341,6 @@ export function BarberPortal() {
           </div>
 
           <div className="space-y-4">
-            {/* Selecionar Unidade */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-zinc-400">Selecione sua Unidade</label>
               <select
@@ -296,7 +358,6 @@ export function BarberPortal() {
               </select>
             </div>
 
-            {/* Selecionar Barbeiro */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-zinc-400">Selecione seu Nome</label>
               <select
@@ -326,10 +387,12 @@ export function BarberPortal() {
     );
   }
 
-  // 2. Fluxo Passo a Passo do Questionário
-  const questions = activeQuestionnaire.questions || [];
-  const currentQuestion: Question = questions[currentStep];
   const progressPercent = Math.round(((currentStep + 1) / questions.length) * 100);
+  const selectedAnswer = answers[currentQuestion.id] || '';
+
+  // Determinar se a opção selecionada necessita de justificativa
+  const activeSelectedOption = currentQuestion?.options?.find(opt => getOptionInfo(opt).text === selectedAnswer);
+  const selectedOptionInfo = getOptionInfo(activeSelectedOption);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between font-sans">
@@ -344,7 +407,6 @@ export function BarberPortal() {
             {currentStep + 1} de {questions.length}
           </span>
         </div>
-        {/* Barra de Progresso */}
         <div className="max-w-lg mx-auto mt-3 h-1 bg-zinc-800 rounded-full overflow-hidden">
           <div 
             className="h-full bg-brand transition-all duration-300 rounded-full" 
@@ -364,18 +426,16 @@ export function BarberPortal() {
             transition={{ duration: 0.25 }}
             className="space-y-6"
           >
-            {/* Texto da Pergunta */}
             <h3 className="text-xl sm:text-2xl font-bold text-zinc-100 leading-tight">
               {currentQuestion.text}
             </h3>
 
-            {/* Renderizar Inputs Baseados no Tipo */}
             <div className="mt-4">
-              {/* Pergunta de Rating (1 a 5 Estrelas) */}
+              {/* Pergunta de Rating */}
               {currentQuestion.type === 'rating' && (
                 <div className="flex justify-center items-center gap-2 py-4">
                   {[1, 2, 3, 4, 5].map((star) => {
-                    const isSelected = answers[currentQuestion.id] === String(star);
+                    const isSelected = selectedAnswer === String(star);
                     return (
                       <button
                         key={star}
@@ -396,30 +456,48 @@ export function BarberPortal() {
 
               {/* Pergunta de Múltipla Escolha */}
               {currentQuestion.type === 'multiple_choice' && (
-                <div className="grid grid-cols-1 gap-3">
-                  {currentQuestion.options?.map((option) => {
-                    const isSelected = answers[currentQuestion.id] === option;
-                    return (
-                      <button
-                        key={option}
-                        onClick={() => handleAnswerSelect(currentQuestion.id, option)}
-                        className={`w-full px-4 py-4 rounded-xl text-left border text-sm font-semibold transition-all cursor-pointer ${
-                          isSelected 
-                            ? 'bg-brand/15 border-brand text-zinc-100 shadow-md shadow-brand/5 scale-[1.01]' 
-                            : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 hover:border-zinc-700'
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3">
+                    {currentQuestion.options?.map((opt, optIdx) => {
+                      const info = getOptionInfo(opt);
+                      const isSelected = selectedAnswer === info.text;
+                      return (
+                        <button
+                          key={optIdx}
+                          onClick={() => handleAnswerSelect(currentQuestion.id, info.text)}
+                          className={`w-full px-4 py-4 rounded-xl text-left border text-sm font-semibold transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'bg-brand/15 border-brand text-zinc-100 shadow-md shadow-brand/5 scale-[1.01]' 
+                              : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 hover:border-zinc-700'
+                          }`}
+                        >
+                          {info.text}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Exibir justificativa se a opção selecionada exigir */}
+                  {selectedOptionInfo.requireJustification && (
+                    <div className="mt-4 space-y-2 animate-in slide-in-from-top-3 duration-250">
+                      <label className="block text-xs font-semibold text-zinc-400">
+                        Por favor, justifique sua escolha: <span className="text-brand">*</span>
+                      </label>
+                      <textarea
+                        value={justificationText}
+                        onChange={(e) => setJustificationText(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-brand min-h-[90px] resize-none focus:ring-1 focus:ring-brand/40"
+                        placeholder="Escreva sua justificativa aqui..."
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Pergunta de Texto Livre */}
               {currentQuestion.type === 'text' && (
                 <textarea
-                  value={answers[currentQuestion.id] || ''}
+                  value={selectedAnswer}
                   onChange={(e) => handleAnswerSelect(currentQuestion.id, e.target.value)}
                   className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-brand min-h-[140px] resize-none focus:ring-1 focus:ring-brand/40"
                   placeholder="Escreva sua resposta aqui..."
@@ -445,7 +523,7 @@ export function BarberPortal() {
           {currentStep === questions.length - 1 ? (
             <button
               onClick={handleSubmit}
-              disabled={!answers[currentQuestion.id] || submitting}
+              disabled={!isCurrentStepValid() || submitting}
               className="flex-1 flex items-center justify-center gap-2 bg-brand text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-light transition-colors disabled:opacity-40 cursor-pointer"
             >
               {submitting ? 'Enviando...' : 'Enviar Questionário'}
@@ -453,8 +531,8 @@ export function BarberPortal() {
             </button>
           ) : (
             <button
-              onClick={nextStep}
-              disabled={!answers[currentQuestion.id]}
+              onClick={handleNext}
+              disabled={!isCurrentStepValid()}
               className="flex-1 flex items-center justify-center gap-2 bg-brand text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-light transition-colors disabled:opacity-40 cursor-pointer"
             >
               Próxima
