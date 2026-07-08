@@ -52,12 +52,19 @@ export default function App() {
               .single();
 
             if (profile && profile.is_active !== false) {
+              const { data: permission } = await supabase
+                .from('hub_permissions')
+                .select('*')
+                .eq('user_id', profile.id)
+                .eq('site_id', 'site-questionarios')
+                .maybeSingle();
+
               cleanUrlParams();
               setCurrentUser({
                 id: profile.id,
                 name: profile.name || hubUser.split('@')[0],
                 email: hubUser,
-                isAdmin: profile.role === 'admin'
+                isAdmin: profile.role === 'admin' || permission?.role === 'administrador'
               });
               setView('admin');
               setAuthLoading(false);
@@ -79,12 +86,19 @@ export default function App() {
             .single();
 
           if (profile && profile.is_active !== false) {
+            const { data: permission } = await supabase
+              .from('hub_permissions')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .eq('site_id', 'site-questionarios')
+              .maybeSingle();
+
             cleanUrlParams();
             setCurrentUser({
               id: session.user.id,
               name: profile.name || session.user.email?.split('@')[0] || 'Usuário',
               email: session.user.email || '',
-              isAdmin: profile.role === 'admin'
+              isAdmin: profile.role === 'admin' || permission?.role === 'administrador'
             });
             setView('admin');
           }
@@ -131,11 +145,25 @@ export default function App() {
           return;
         }
 
+        const { data: permission } = await supabase
+          .from('hub_permissions')
+          .select('*')
+          .eq('user_id', data.user.id)
+          .eq('site_id', 'site-questionarios')
+          .maybeSingle();
+
+        // Se for operador e não tiver permissão para este site, bloqueia o acesso
+        if (profile.role !== 'admin' && !permission) {
+          setLoginError('Você não possui permissão para acessar este sistema.');
+          await supabase.auth.signOut();
+          return;
+        }
+
         setCurrentUser({
           id: data.user.id,
           name: profile.name || data.user.email?.split('@')[0] || 'Usuário',
           email: data.user.email || '',
-          isAdmin: profile.role === 'admin'
+          isAdmin: profile.role === 'admin' || permission?.role === 'administrador'
         });
       }
     } catch (err) {
