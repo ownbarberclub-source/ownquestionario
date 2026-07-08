@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import type { Unit, Barber, Questionnaire, Question } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -77,7 +77,7 @@ export function BarberPortal() {
     // Verificar se o barbeiro já respondeu a este questionário
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('questionnaire_responses')
         .select('id')
         .eq('questionnaire_id', activeQuestionnaire.id)

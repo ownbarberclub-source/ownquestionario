@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import type { Questionnaire, Question, QuestionnaireResponse, Answer } from '../types';
+import type { Questionnaire, Question, QuestionnaireResponse } from '../types';
 import { QuestionnaireCreator } from './QuestionnaireCreator';
 import { 
-  FileText, Plus, Trash, CheckCircle2, Circle, Eye, EyeOff, 
-  BarChart3, Users, Clock, Filter, RefreshCw, ChevronDown, ChevronUp, Star 
+  FileText, Plus, Trash, CheckCircle2, Circle, 
+  BarChart3, Users, Clock, RefreshCw, ChevronDown, ChevronUp, Star 
 } from 'lucide-react';
 
 export function AdminDashboard() {
@@ -14,7 +14,6 @@ export function AdminDashboard() {
   
   // Modais e Status
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [expandedResponse, setExpandedResponse] = useState<string | null>(null);
 
   // Filtros
@@ -35,7 +34,6 @@ export function AdminDashboard() {
 
   const loadDashboardData = async () => {
     try {
-      setLoading(true);
       // Carrega todos os questionários com suas perguntas
       const { data: questsData } = await supabase
         .from('barber_questionnaires')
@@ -53,8 +51,6 @@ export function AdminDashboard() {
       }
     } catch (err) {
       console.error('Erro ao carregar questionários:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
